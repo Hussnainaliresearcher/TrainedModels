@@ -9,7 +9,7 @@ import numpy as np
 import os
 import boto3
 
-st.set_page_config(page_title="Random Forest Predictor", layout="centered")
+st.set_page_config(page_title="Random Forest Predictor Model", layout="centered")
 
 @st.cache_resource
 def load_pipeline(pkl_path="pipeline.pkl"):
