@@ -187,30 +187,31 @@ def main():
                 st.success(f"### 🎯 Predicted Class: **{pred_val}**")
                 
                 if hasattr(model, "decision_function"):
-    try:
-        scores = model.decision_function(df_processed.values)
-        classes = model.classes_
-        decoded_classes = [decode_target(c, pipeline) for c in classes]
+                    try:
+                        scores = model.decision_function(df_processed.values)
+                        classes = model.classes_
+                        decoded_classes = [decode_target(c, pipeline) for c in classes]
 
-        if len(classes) == 2:
-            # Binary classification: manual sigmoid
-            score = scores[0] if hasattr(scores, "__len__") else scores
-            prob_positive = 1 / (1 + np.exp(-score))
-            probs = [1 - prob_positive, prob_positive]
-        else:
-            # Multiclass: manual softmax
-            exp_scores = np.exp(scores[0] - np.max(scores[0]))
-            probs = exp_scores / exp_scores.sum()
+                        if len(classes) == 2:
+                            # Binary classification: manual sigmoid
+                            score = scores[0] if hasattr(scores, "__len__") else scores
+                            prob_positive = 1 / (1 + np.exp(-score))
+                            probs = [1 - prob_positive, prob_positive]
+                        else:
+                            # Multiclass: manual softmax
+                            exp_scores = np.exp(scores[0] - np.max(scores[0]))
+                            probs = exp_scores / exp_scores.sum()
 
-        st.markdown("**Class Probabilities:**")
-        prob_df = pd.DataFrame({"Class": decoded_classes, "Probability": probs})
-        st.dataframe(
-            prob_df.style.format({"Probability": "{:.4f}"}),
-            use_container_width=True
-        )
-    except Exception as e:
-        st.warning(f"Could not compute probabilities: {e}")
-
+                        st.markdown("**Class Probabilities:**")
+                        prob_df = pd.DataFrame({"Class": decoded_classes, "Probability": probs})
+                        st.dataframe(
+                            prob_df.style.format({"Probability": "{:.4f}"}),
+                            use_container_width=True
+                        )
+                    except Exception as e:
+                        st.warning(f"Could not compute probabilities: {e}")
+        except Exception as e:
+            st.error(f"Prediction failed: {e}")
 
 if __name__ == "__main__":
     main()
