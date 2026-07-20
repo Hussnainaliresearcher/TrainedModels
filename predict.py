@@ -186,17 +186,17 @@ def main():
             else:
                 st.success(f"### 🎯 Predicted Class: **{pred_val}**")
                 
-                # if hasattr(model, "predict_proba"):
-                #     probs = model.predict_proba(df_processed.values)[0]
-                #     classes = model.classes_
-                #     decoded_classes = [decode_target(c, pipeline) for c in classes]
+                if hasattr(model, "predict_proba"):
+                    probs = model.predict_proba(df_processed.values)[0]
+                    classes = model.classes_
+                    decoded_classes = [decode_target(c, pipeline) for c in classes]
                     
-                #     st.markdown("**Class Probabilities:**")
-                #     prob_df = pd.DataFrame({"Class": decoded_classes, "Probability": probs})
-                #     st.dataframe(
-                #         prob_df.style.format({"Probability": "{:.4f}"}),
-                #         use_container_width=True
-                #     )
+                    st.markdown("**Class Probabilities:**")
+                    prob_df = pd.DataFrame({"Class": decoded_classes, "Probability": probs})
+                    st.dataframe(
+                        prob_df.style.format({"Probability": "{:.4f}"}),
+                        use_container_width=True
+                    )
         except Exception as e:
             st.error(f"Prediction error: {e}")
 
