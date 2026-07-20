@@ -1,27 +1,27 @@
 # ==============================================================================
 # PIPELINE PREDICTION APP
-# Model: Gradient Boosting | Task: Classification
+# Model: AdaBoost | Task: Classification
 # ==============================================================================
 import streamlit as st
 import pickle
 import pandas as pd
 import numpy as np
 import os
-import boto3
 
-st.set_page_config(page_title="Random Forest Predictor Model", layout="centered")
+st.set_page_config(page_title="AdaBoost Predictor", layout="centered")
 
 @st.cache_resource
 def load_pipeline(pkl_path="pipeline.pkl"):
-    """Loads the model pipeline. Priority is given to S3 storage if configured."""
+    """Loads the model pipeline. Priority is given to S3 storage if configured
+    via the AWS_S3_BUCKET and AWS_S3_MODEL_KEY environment variables; otherwise
+    falls back to reading pkl_path from local disk."""
     s3_bucket = os.getenv("AWS_S3_BUCKET")
-    s3_model_key = os.getenv("AWS_S3_MODEL_KEY")  # e.g., 'model.pkl' or 'pipeline.pkl'
-
-    # If custom S3 key is provided, update target path name
+    s3_model_key = os.getenv("AWS_S3_MODEL_KEY")
     target_path = s3_model_key if s3_model_key else pkl_path
 
     if s3_bucket and s3_model_key:
         try:
+            import boto3
             s3 = boto3.client("s3")
             s3.download_file(s3_bucket, s3_model_key, target_path)
             pkl_path = target_path
@@ -31,27 +31,27 @@ def load_pipeline(pkl_path="pipeline.pkl"):
     with open(pkl_path, "rb") as f:
         return pickle.load(f)
 
-
 def preprocess_data(df_raw, pipeline):
     """Mimics the main app's preprocessing to convert human inputs into model features."""
     df = df_raw.copy()
     enc_meta = pipeline.get("enc_meta", {})
     scalers = pipeline.get("scalers", {})
     features = pipeline.get("feature_cols", [])
-
+    
     # 1. Apply Categorical Encodings (Label / One-Hot)
     for col, meta in enc_meta.items():
         if col not in df.columns:
             continue
-
+            
         method = meta.get("method")
         if method in ["label", "ordinal"]:
             stored_map = meta.get("stored_map", {})
-            df[col] = df[col].map(stored_map).fillna(0)  # Fallback to 0
-
+            df[col] = df[col].map(stored_map).fillna(0) # Fallback to 0
+            
         elif method == "onehot":
             dummy_cols = meta.get("stored_dummy_cols", [])
             for d_col in dummy_cols:
+                # pandas get_dummies format is typically colName_value
                 prefix = f"{col}_"
                 if d_col.startswith(prefix):
                     val = d_col[len(prefix):]
@@ -59,49 +59,52 @@ def preprocess_data(df_raw, pipeline):
                 else:
                     df[d_col] = 0.0
             df = df.drop(columns=[col])
-
+            
     # 2. Apply Numerical Scalers
     for col, scaler in scalers.items():
         if col in df.columns:
             try:
+                # .values prevents feature names mismatch warnings
                 df[col] = scaler.transform(df[[col]].values)
             except Exception:
                 pass
-
+                
     # 3. Ensure exact column match for model
     for f in features:
         if f not in df.columns:
             df[f] = 0.0
-
+            
     return df[features]
-
 
 def decode_target(pred, pipeline):
     """Converts numeric predictions back to original string classes."""
     problem_type = pipeline.get("problem_type")
     target_col = pipeline.get("target_col")
     enc_meta = pipeline.get("enc_meta", {})
-
+    
     if problem_type == "Classification" and target_col in enc_meta:
         stored_map = enc_meta[target_col].get("stored_map", {})
         inv_map = {v: k for k, v in stored_map.items()}
         return inv_map.get(pred, pred)
     return pred
 
-
 def render_df_as_markdown(df, max_rows=None):
     """
     Safe replacement for st.dataframe()/st.table().
     Avoids Streamlit's PyArrow-based serialization path, which has been
-    observed to segfault the whole container on this deployment.
-    Renders a plain Markdown table instead.
+    observed to crash the whole process on some deployments. Renders a
+    plain Markdown table instead. Requires the 'tabulate' package.
     """
     display_df = df.head(max_rows) if max_rows else df
-    st.markdown(display_df.to_markdown(index=False))
-
+    try:
+        st.markdown(display_df.to_markdown(index=False))
+    except Exception:
+        # Fallback if 'tabulate' isn't installed: plain text rows
+        for _, row in display_df.iterrows():
+            st.write(dict(row))
 
 def main():
-    st.title("🎯 Gradient Boosting Predictor")
+    st.title("🎯 AdaBoost Predictor")
     st.write("Task: **Classification**")
 
     try:
@@ -124,22 +127,27 @@ def main():
     if batch_file:
         st.sidebar.info("Processing...")
         df_batch = pd.read_csv(batch_file)
-
+        
         try:
+            # Run data through the preprocessing pipeline
             df_processed = preprocess_data(df_batch, pipeline)
-            preds = model.predict(df_processed.values.astype(np.float64))
-
+            X = df_processed.values.astype(np.float64)
+            
+            # Predict
+            preds = model.predict(X)
+            
+            # Post-process target
             if target_transform == "Apply inverse log (np.expm1)" and "Classification" == "Regression":
                 preds = np.expm1(preds)
             elif "Classification" == "Classification":
                 preds = [decode_target(p, pipeline) for p in preds]
-
+                
             df_batch[f"Predicted_{target_col}"] = preds
             st.sidebar.success("✅ Batch prediction complete!")
             st.sidebar.download_button(
-                label="⬇️ Download Predictions",
-                data=df_batch.to_csv(index=False),
-                file_name="predictions.csv",
+                label="⬇️ Download Predictions", 
+                data=df_batch.to_csv(index=False), 
+                file_name="predictions.csv", 
                 mime="text/csv"
             )
             st.subheader("Batch Prediction Results")
@@ -162,7 +170,7 @@ def main():
             for col_ui, feature in zip(cols, row_cols):
                 with col_ui:
                     meta = ui_metadata.get(feature, {})
-
+                    
                     if meta.get("type") == "categorical":
                         opts = meta.get("options", [""])
                         input_dict[feature] = st.selectbox(
@@ -181,17 +189,21 @@ def main():
         submit = st.form_submit_button("🔮 Predict", type="primary")
 
     if submit:
+        # 1. Create DataFrame from human input
         df_input = pd.DataFrame([input_dict])
-
+        
         try:
+            # 2. Transform into model features (OneHot, Scaling, etc.)
             df_processed = preprocess_data(df_input, pipeline)
             X = df_processed.values.astype(np.float64)
-
+            
+            # 3. Predict
             pred = model.predict(X)
-
+            
+            # 4. Format Target Output
             if target_transform == "Apply inverse log (np.expm1)" and "Classification" == "Regression":
                 pred = np.expm1(pred)
-
+                
             pred_val = pred[0]
             if "Classification" == "Classification":
                 pred_val = decode_target(pred_val, pipeline)
@@ -201,22 +213,21 @@ def main():
                 st.success(f"### 🎯 Predicted {target_col}: **{pred_val:,.4f}**")
             else:
                 st.success(f"### 🎯 Predicted Class: **{pred_val}**")
-
+                
+                # Render probabilities if the model supports it
                 if hasattr(model, "predict_proba"):
                     probs = model.predict_proba(X)[0]
                     classes = model.classes_
+                    # Map classes back to text strings if encoded
                     decoded_classes = [decode_target(c, pipeline) for c in classes]
-
+                    
                     st.markdown("**Class Probabilities:**")
-                    # NOTE: intentionally NOT using st.dataframe()/st.table() here.
-                    # Both route through Streamlit's PyArrow-based serialization,
-                    # which was found to segfault the container on this deployment.
+                    # Intentionally NOT using st.dataframe()/st.table() here —
+                    # see render_df_as_markdown() docstring above for why.
                     for cls, p in zip(decoded_classes, probs):
                         st.write(f"{cls}: {p:.4f}")
-
         except Exception as e:
             st.error(f"Prediction error: {e}")
-
 
 if __name__ == "__main__":
     main()
