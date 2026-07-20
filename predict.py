@@ -113,7 +113,7 @@ def main():
         
         try:
             df_processed = preprocess_data(df_batch, pipeline)
-            preds = model.predict(df_processed.values)
+            preds = model.predict(df_processed.values.astype(np.float64))
             
             if target_transform == "Apply inverse log (np.expm1)" and "Classification" == "Regression":
                 preds = np.expm1(preds)
@@ -171,7 +171,7 @@ def main():
         
         try:
             df_processed = preprocess_data(df_input, pipeline)
-            pred = model.predict(df_processed.values)
+            pred = model.predict(df_processed.values.astype(np.float64))
             
             if target_transform == "Apply inverse log (np.expm1)" and "Classification" == "Regression":
                 pred = np.expm1(pred)
@@ -186,21 +186,11 @@ def main():
             else:
                 st.success(f"### 🎯 Predicted Class: **{pred_val}**")
                 
-                if hasattr(model, "decision_function"):
+                if hasattr(model, "predict_proba"):
                     try:
-                        scores = model.decision_function(df_processed.values)
+                        probs = model.predict_proba(df_processed.values.astype(np.float64))[0]
                         classes = model.classes_
                         decoded_classes = [decode_target(c, pipeline) for c in classes]
-
-                        if len(classes) == 2:
-                            # Binary classification: manual sigmoid
-                            score = scores[0] if hasattr(scores, "__len__") else scores
-                            prob_positive = 1 / (1 + np.exp(-score))
-                            probs = [1 - prob_positive, prob_positive]
-                        else:
-                            # Multiclass: manual softmax
-                            exp_scores = np.exp(scores[0] - np.max(scores[0]))
-                            probs = exp_scores / exp_scores.sum()
 
                         st.markdown("**Class Probabilities:**")
                         prob_df = pd.DataFrame({"Class": decoded_classes, "Probability": probs})
@@ -212,6 +202,7 @@ def main():
                         st.warning(f"Could not compute probabilities: {e}")
         except Exception as e:
             st.error(f"Prediction failed: {e}")
+
 
 if __name__ == "__main__":
     main()
