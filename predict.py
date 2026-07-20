@@ -193,11 +193,9 @@ def main():
                         decoded_classes = [decode_target(c, pipeline) for c in classes]
 
                         st.markdown("**Class Probabilities:**")
-                        prob_df = pd.DataFrame({"Class": decoded_classes, "Probability": probs})
-                        st.dataframe(
-                            prob_df.style.format({"Probability": "{:.4f}"}),
-                            use_container_width=True
-                        )
+                        for cls, p in zip(decoded_classes, probs):
+                            st.write(f"{cls}: {p:.4f}")
+
                     except Exception as e:
                         st.warning(f"Could not compute probabilities: {e}")
         except Exception as e:
