@@ -68,6 +68,7 @@ jobs:
           docker stop streamlit-ml-app 2>/dev/null || true
           docker rm streamlit-ml-app 2>/dev/null || true
           docker run -d --name streamlit-ml-app \
+            --restart=always \
             -e KMP_DUPLICATE_LIB_OK=TRUE \
             -e OMP_NUM_THREADS=1 \
             -e OPENBLAS_NUM_THREADS=1 \

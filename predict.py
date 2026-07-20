@@ -1,6 +1,6 @@
 # ==============================================================================
 # PIPELINE PREDICTION APP
-# Model: AdaBoost | Task: Classification
+# Model: Decision Tree | Task: Classification
 # ==============================================================================
 import streamlit as st
 import pickle
@@ -8,7 +8,7 @@ import pandas as pd
 import numpy as np
 import os
 
-st.set_page_config(page_title="AdaBoost Predictor", layout="centered")
+st.set_page_config(page_title="Decision Tree Predictor", layout="centered")
 
 @st.cache_resource
 def load_pipeline(pkl_path="pipeline.pkl"):
@@ -104,7 +104,7 @@ def render_df_as_markdown(df, max_rows=None):
             st.write(dict(row))
 
 def main():
-    st.title("🎯 AdaBoost Predictor")
+    st.title("🎯 Decision Tree Predictor")
     st.write("Task: **Classification**")
 
     try:
